@@ -26,7 +26,6 @@ export const useAuthStore = create<AuthStore>((set) => ({
       email,
       password,
     });
-
     if (error) {
       return { error: error.message };
     }
