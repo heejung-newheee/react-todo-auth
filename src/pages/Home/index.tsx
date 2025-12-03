@@ -1,30 +1,98 @@
-// import { useQuery } from "@tanstack/react-query";
-import { getTotos } from "@/services/api";
-import { useTodoStore } from "@/stores/todoStore";
-import { useQuery } from "@tanstack/react-query";
+import * as api from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 export const Home = () => {
   const [inputText, setInputText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
-  const { todos, addTodo, updateTodo, deleteTodo, toggleTodo } = useTodoStore();
+  const user = useAuthStore((state) => state.user);
+  console.log(user);
+  const queryClient = useQueryClient();
+  // Zustand만 사용 (로컬 상태만 관리)
+  //  const { todos, addTodo, updateTodo, deleteTodo, toggleTodo } = useTodoStore();
+  //   const handleSubmit = (e: React.FormEvent) => {
+  //     e.preventDefault();
+  //     if (inputText.trim()) {
+  //       addTodo(inputText);
+  //       setInputText("");
+  //     }
+  //   };
+
+  //   const handleEdit = (id: string, text: string) => {
+  //     setEditingId(id);
+  //     setEditText(text);
+  //   };
+
+  //   const handleUpdate = (id: string) => {
+  //     if (editText.trim()) {
+  //       updateTodo(id, editText);
+  //       setEditingId(null);
+  //       setEditText("");
+  //     }
+  //   };
+
+  //   const handleCancelEdit = () => {
+  //     setEditingId(null);
+  //     setEditText("");
+  //   };
+
+  // Todos 조회
+  const { data: todos = [], isLoading } = useQuery({
+    queryKey: ["todos"],
+    queryFn: () => api.getTodos(user?.id || ""),
+  });
+  // Todo 추가
+  const addMutation = useMutation({
+    mutationFn: api.addTodo,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+
+  // Todo 수정
+  const updateMutation = useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) =>
+      api.updateTodo(id, text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+
+  // Todo 삭제
+  const deleteMutation = useMutation({
+    mutationFn: api.deleteTodo,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+
+  // Todo 토글
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, isDone }: { id: string; isDone: boolean }) =>
+      api.toggleTodo(id, isDone),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["todos"] });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputText.trim()) {
-      addTodo(inputText);
+      addMutation.mutate(inputText);
       setInputText("");
     }
   };
 
-  const handleEdit = (id: string, text: string) => {
+  const handleEdit = (id: string, contents: string) => {
     setEditingId(id);
-    setEditText(text);
+    setEditText(contents);
   };
 
   const handleUpdate = (id: string) => {
     if (editText.trim()) {
-      updateTodo(id, editText);
+      updateMutation.mutate({ id, text: editText });
       setEditingId(null);
       setEditText("");
     }
@@ -35,18 +103,17 @@ export const Home = () => {
     setEditText("");
   };
 
-  const { data: todosFromDB } = useQuery({
-    queryKey: ["todos"],
-    queryFn: getTotos,
-  });
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full bg-gray-100 flex justify-center items-center">
+        <p className="text-gray-600">로딩 중...</p>
+      </div>
+    );
+  }
 
-  console.log("todos from DB:", todosFromDB);
-  console.log("todos from store:", todos);
-
-  console.log(todosFromDB);
   return (
     <div className="min-h-screen w-full bg-gray-100 flex justify-center items-start p-6">
-      <div className="w-[600px] bg-white rounded-lg shadow-md p-6 ">
+      <div className="w-[600px] bg-white rounded-lg shadow-md p-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-6">Todo List</h1>
 
         {/* Input Form */}
@@ -61,9 +128,10 @@ export const Home = () => {
             />
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={addMutation.isPending}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              추가
+              {addMutation.isPending ? "추가 중..." : "추가"}
             </button>
           </div>
         </form>
@@ -77,8 +145,13 @@ export const Home = () => {
             >
               <input
                 type="checkbox"
-                checked={todo.completed}
-                onChange={() => toggleTodo(todo.id)}
+                checked={todo.isDone}
+                onChange={() =>
+                  toggleMutation.mutate({
+                    id: todo.id,
+                    isDone: todo.isDone,
+                  })
+                }
                 className="w-5 h-5 text-blue-500 rounded focus:ring-2 focus:ring-blue-500"
               />
 
@@ -93,7 +166,8 @@ export const Home = () => {
                   />
                   <button
                     onClick={() => handleUpdate(todo.id)}
-                    className="px-3 py-1 text-sm text-green-500 hover:bg-green-50 rounded"
+                    disabled={updateMutation.isPending}
+                    className="px-3 py-1 text-sm text-green-500 hover:bg-green-50 rounded disabled:opacity-50"
                   >
                     저장
                   </button>
@@ -108,22 +182,23 @@ export const Home = () => {
                 <>
                   <span
                     className={`flex-1 ${
-                      todo.completed
+                      todo.isDone
                         ? "line-through text-gray-400"
                         : "text-gray-800"
                     }`}
                   >
-                    {todo.text}
+                    {todo.contents}
                   </span>
                   <button
-                    onClick={() => handleEdit(todo.id, todo.text)}
+                    onClick={() => handleEdit(todo.id, todo.contents)}
                     className="px-3 py-1 text-sm text-blue-500 hover:bg-blue-50 rounded"
                   >
                     수정
                   </button>
                   <button
-                    onClick={() => deleteTodo(todo.id)}
-                    className="px-3 py-1 text-sm text-red-500 hover:bg-red-50 rounded"
+                    onClick={() => deleteMutation.mutate(todo.id)}
+                    disabled={deleteMutation.isPending}
+                    className="px-3 py-1 text-sm text-red-500 hover:bg-red-50 rounded disabled:opacity-50"
                   >
                     삭제
                   </button>
