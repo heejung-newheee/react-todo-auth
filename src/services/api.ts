@@ -4,17 +4,17 @@ export interface Todo {
   id: string;
   contents: string;
   isDone: boolean;
-  created_at: string;
+  createdAt: string;
   pinned?: boolean;
-  user_id?: string;
+  userId?: string;
 }
 
-export const getTodos = async (user_id: string) => {
+export const getTodos = async (userId: string) => {
   const { data, error } = await supabase
     .from("todos")
     .select()
-    .match({ user_id })
-    .order("created_at", { ascending: false });
+    .match({ userId })
+    .order("createdAt", { ascending: false });
   if (error) throw error;
   return data as Todo[];
 };
@@ -26,7 +26,7 @@ export const addTodo = async (contents: string) => {
 
   const { data, error } = await supabase
     .from("todos")
-    .insert([{ contents, isDone: false, user_id: user?.id }])
+    .insert([{ contents, isDone: false, userId: user?.id }])
     .select()
     .single();
   if (error) throw error;

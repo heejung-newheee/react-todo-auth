@@ -8,7 +8,6 @@ export const Home = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const user = useAuthStore((state) => state.user);
-  console.log(user);
   const queryClient = useQueryClient();
   // Zustand만 사용 (로컬 상태만 관리)
   //  const { todos, addTodo, updateTodo, deleteTodo, toggleTodo } = useTodoStore();
